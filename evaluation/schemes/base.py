@@ -79,3 +79,16 @@ class BaseScheme(ABC):
         Returns a list of helper nodes (may be empty).
         """
         ...
+
+    def notify_helper_assist(
+        self,
+        node_id: str,
+        actual_proc_ms: float,
+        start_time: float,
+    ) -> None:
+        """
+        Callback: simulator informs the scheme of actual (helper-reduced)
+        processing time after assistance.  Default is a no-op; schemes
+        that maintain internal backlog tracking can override this.
+        """
+        pass

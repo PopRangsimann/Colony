@@ -82,7 +82,7 @@ def main():
         ylabel="Completion Ratio (%)",
         filename="fig5_resilience",
         logx=True,
-        ylim=(85, 101),
+        ylim=(80, 101),
     )
     print(f"  Done in {time.time()-t0:.1f}s")
 

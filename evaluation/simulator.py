@@ -148,6 +148,12 @@ class Simulator:
                     )
                     completion_time = workload.arrival_time + total_latency
 
+                    # Notify scheme of actual (reduced) processing time
+                    # so it can correct internal backlog estimates.
+                    self.scheme.notify_helper_assist(
+                        target.node_id, processing_ms, effective_arrival
+                    )
+
                     # Helpers contribute processing power; workload
                     # remains in primary node's queue (no queue impact).
                     for h in helpers:

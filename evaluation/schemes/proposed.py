@@ -74,7 +74,22 @@ class ProposedScheme(BaseScheme):
         est_free = self._est_free_at.get(node.node_id, 0.0)
         est_wait = max(0.0, est_free - workload.arrival_time)
         proc_ms = node.processing_time(workload.size) * 1000
-        est_total = est_wait + proc_ms + node.comm_latency_ms()
+        comm_ms = node.comm_latency_ms()
+        est_total = est_wait + proc_ms + comm_ms
+
+        # Helper-aware estimation: if this node would be overloaded,
+        # the MFN knows it will dispatch helpers (Colony uses 3 helpers,
+        # each contributing HELPER_ASSIST_FACTOR).  Pre-factor the
+        # expected speedup so scheduling doesn't over-penalize busy nodes
+        # that will receive assistance.
+        would_overload = (
+            node.queue_occupancy > sim_config.OVERLOAD_THRESHOLD
+            or (workload.arrival_time + est_total) > workload.deadline
+        )
+        if would_overload:
+            n_expected_helpers = 3  # Colony's design: up to 3 helpers
+            assist_factor = 1.0 / (1.0 + n_expected_helpers * sim_config.HELPER_ASSIST_FACTOR)
+            est_total = est_wait + proc_ms * assist_factor + comm_ms
 
         # Principled normalization from config parameters:
         # max possible wait = full queue on slowest node
@@ -219,3 +234,11 @@ class ProposedScheme(BaseScheme):
             helpers.append(fallback[0][0])
 
         return helpers
+
+    # ─── Backlog feedback from simulator ────────────────────────────
+
+    def notify_helper_assist(
+        self, node_id: str, actual_proc_ms: float, start_time: float
+    ) -> None:
+        """Correct backlog estimate after helpers reduce processing time."""
+        self._est_free_at[node_id] = start_time + actual_proc_ms
