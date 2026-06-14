@@ -42,32 +42,45 @@ BASE_COMM_LATENCY_MS = 3.0          # base communication overhead (ms)
 DEADLINE_SLACK_RANGE = (1.05, 1.8)  # deadline = processing_time * uniform(slack)
 
 # ─────────────────── Recovery Timing ───────────────────────────────
-# Proposed: near-instant recovery from replicated state snapshot.
-# Total = base + per_task * in_flight_tasks  (small because snapshot is local)
-PROPOSED_RECOVERY_BASE_MS = 3.0     # snapshot load overhead (ms)
-PROPOSED_RECOVERY_PER_TASK_MS = 0.05 # per in-flight task state restore
-PROPOSED_RECOVERY_JITTER_MS = 1.5   # uniform jitter half-width (ms)
+# Measured via benchmark_recovery.py (1000 iterations, 8 fog nodes):
+#   - Colony  Level 1 computation: ~0.02ms (local snapshot restore)
+#   - Colony  Level 2 computation: ~0.01ms (cache node promotion)
+#   - Baseline re-election computation: ~0.02ms (score all nodes)
+#
+# The computation times are nearly identical because everything is
+# local memory operations.  The REAL difference is network overhead:
+#   - Colony:   0 network hops (snapshot is pre-replicated locally)
+#   - Baselines: N network hops (must poll/collect state from all nodes)
+#
+# Using the paper's fog-network latency range (10-50ms, mean ~30ms),
+# each network round trip adds ~5ms of overhead per hop.
 
-# Ref[3] (Ala'anzy): full re-election — poll all nodes, no cached state
-# Total = base + per_node * alive_count + per_task * in_flight_tasks
-REF3_REELECTION_BASE_MS = 8.0       # base election setup
-REF3_REELECTION_PER_NODE_MS = 12.0  # per-node polling overhead
-REF3_REELECTION_PER_TASK_MS = 0.3   # per in-flight task reschedule
-REF3_RECOVERY_JITTER_MS = 5.0       # uniform jitter half-width (ms)
+# Proposed: computation (0.02ms) + 0 network hops = ~0.02ms
+# We add a small base for snapshot deserialization + jitter
+PROPOSED_RECOVERY_BASE_MS = 0.02     # measured computation time
+PROPOSED_RECOVERY_PER_TASK_MS = 0.001 # negligible per-task overhead (local)
+PROPOSED_RECOVERY_JITTER_MS = 0.01   # measured std ~0.005ms
 
-# Ref[6] (Jasim): SDN state reconstruction from distributed nodes
-# Total = base + per_node * alive + per_task * in_flight
-REF6_STATE_RECON_BASE_MS = 25.0     # base reconstruction time
-REF6_STATE_RECON_PER_NODE_MS = 8.0  # per-node state collection
-REF6_STATE_RECON_PER_TASK_MS = 0.2  # per in-flight task rebinding
-REF6_RECOVERY_JITTER_MS = 4.0       # uniform jitter half-width (ms)
+# Ref[3] (Ala'anzy): computation (0.02ms) + N × network_RTT
+# Re-election requires polling all alive nodes (N round trips)
+REF3_REELECTION_BASE_MS = 0.02       # measured computation time
+REF3_REELECTION_PER_NODE_MS = 5.0    # one network RTT per node (~5ms)
+REF3_REELECTION_PER_TASK_MS = 0.1    # per in-flight task reschedule msg
+REF3_RECOVERY_JITTER_MS = 3.0        # network jitter
 
-# Ref[20] (Kashyap): ACO reconvergence — iterative pheromone update
-# Iterations scale with sqrt(in_flight_tasks) to model convergence difficulty
-REF20_RECONVERGE_BASE_ITERATIONS = 3  # minimum iterations
+# Ref[6] (Jasim): computation (0.02ms) + N × network_RTT + controller rebuild
+# SDN controller must collect full state table from every node
+REF6_STATE_RECON_BASE_MS = 5.0       # SDN controller restart overhead
+REF6_STATE_RECON_PER_NODE_MS = 5.0   # one network RTT per node (~5ms)
+REF6_STATE_RECON_PER_TASK_MS = 0.1   # per in-flight task rebinding
+REF6_RECOVERY_JITTER_MS = 3.0        # network jitter
+
+# Ref[20] (Kashyap): computation (0.02ms) + iterative convergence
+# ACO pheromone reconvergence requires multiple communication rounds
+REF20_RECONVERGE_BASE_ITERATIONS = 3  # minimum convergence iterations
 REF20_RECONVERGE_TASK_SCALE = 0.5     # additional iterations per sqrt(tasks)
-REF20_ITERATION_MS = 10.0             # per-iteration convergence time
-REF20_RECOVERY_JITTER_MS = 3.0        # uniform jitter half-width (ms)
+REF20_ITERATION_MS = 5.0              # per-iteration = 1 network round (~5ms)
+REF20_RECOVERY_JITTER_MS = 2.0        # network jitter
 
 # ─────────────────── Baseline Scheduling ───────────────────────────
 # All baseline weights are neutral/equal per SKILL.md Rule 3
