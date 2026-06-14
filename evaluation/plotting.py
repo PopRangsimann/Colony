@@ -65,6 +65,10 @@ SCHEME_STYLE = {
         "color": "#1f77b4",   # blue
         "marker": "o",        # circle
     },
+    "Ours (1-helper)": {
+        "color": "#6baed6",   # light blue
+        "marker": "v",        # inverted triangle
+    },
 }
 
 # Map old scheme names to new display names
@@ -73,6 +77,7 @@ DISPLAY_NAMES = {
     "Jasim & Al-Raweshidy": "Ref[6]",
     "Kashyap et al.":       "Ref[20]",
     "Proposed":             "Ours",
+    "Proposed (1-helper)":  "Ours (1-helper)",
 }
 
 

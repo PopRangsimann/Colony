@@ -55,7 +55,7 @@ class Ref20Scheme(BaseScheme):
 
         # Normalize makespan and energy to [0, 1] range approximately
         ms_norm = min(ms / 1000.0, 1.0)
-        en_norm = min(en / 500.0, 1.0)
+        en_norm = min(en / sim_config.REF20_ENERGY_NORM, 1.0)
 
         f = (
             sim_config.REF20_W_MAKESPAN * ms_norm
@@ -90,12 +90,19 @@ class Ref20Scheme(BaseScheme):
         best = max(candidates, key=lambda n: self._fitness(n, workload))
         return best
 
-    def handle_failure(self, nodes, failed_node) -> float:
-        # ACO reconvergence: iterative pheromone trail update
-        return (
-            sim_config.REF20_RECONVERGE_ITERATIONS
-            * sim_config.REF20_ITERATION_MS
+    def handle_failure(self, nodes, failed_node, in_flight_tasks=0) -> float:
+        # ACO reconvergence: iterations scale with system complexity
+        import random, math
+        iterations = (
+            sim_config.REF20_RECONVERGE_BASE_ITERATIONS
+            + sim_config.REF20_RECONVERGE_TASK_SCALE * math.sqrt(max(in_flight_tasks, 1))
         )
+        base = iterations * sim_config.REF20_ITERATION_MS
+        jitter = random.uniform(
+            -sim_config.REF20_RECOVERY_JITTER_MS,
+            sim_config.REF20_RECOVERY_JITTER_MS,
+        )
+        return max(1.0, base + jitter)
 
     def request_assistance(self, nodes, overloaded, workload) -> List[SimFogNode]:
         # ACO-based rerouting: select most reliable alternative node

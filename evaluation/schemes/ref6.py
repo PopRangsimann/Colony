@@ -98,13 +98,18 @@ class Ref6Scheme(BaseScheme):
 
         return best_node
 
-    def handle_failure(self, nodes, failed_node) -> float:
-        # SDN state reconstruction: base + per-node collection
+    def handle_failure(self, nodes, failed_node, in_flight_tasks=0) -> float:
+        # SDN state reconstruction: base + per-node collection + per-task rebinding
+        import random
         alive_count = sum(1 for n in nodes if n.is_alive)
-        return (
-            sim_config.REF6_STATE_RECON_BASE_MS
-            + sim_config.REF6_STATE_RECON_PER_NODE_MS * alive_count
+        base = sim_config.REF6_STATE_RECON_BASE_MS
+        node_cost = sim_config.REF6_STATE_RECON_PER_NODE_MS * alive_count
+        task_cost = sim_config.REF6_STATE_RECON_PER_TASK_MS * in_flight_tasks
+        jitter = random.uniform(
+            -sim_config.REF6_RECOVERY_JITTER_MS,
+            sim_config.REF6_RECOVERY_JITTER_MS,
         )
+        return max(1.0, base + node_cost + task_cost + jitter)
 
     def request_assistance(self, nodes, overloaded, workload) -> List[SimFogNode]:
         # Basic load migration: offload to least-loaded neighbor

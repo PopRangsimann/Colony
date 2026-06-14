@@ -54,9 +54,15 @@ class BaseScheme(ABC):
         self,
         nodes: List[SimFogNode],
         failed_node: SimFogNode,
+        in_flight_tasks: int = 0,
     ) -> float:
         """
         Handle a node failure and return recovery latency in ms.
+
+        Parameters
+        ----------
+        in_flight_tasks : int
+            Number of tasks currently queued across all alive nodes.
         """
         ...
 

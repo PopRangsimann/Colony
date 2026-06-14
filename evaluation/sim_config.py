@@ -42,19 +42,32 @@ BASE_COMM_LATENCY_MS = 3.0          # base communication overhead (ms)
 DEADLINE_SLACK_RANGE = (1.05, 1.8)  # deadline = processing_time * uniform(slack)
 
 # ─────────────────── Recovery Timing ───────────────────────────────
-# Proposed: instant recovery from replicated state
-PROPOSED_RECOVERY_BASE_MS = 5.0     # fixed small overhead
+# Proposed: near-instant recovery from replicated state snapshot.
+# Total = base + per_task * in_flight_tasks  (small because snapshot is local)
+PROPOSED_RECOVERY_BASE_MS = 3.0     # snapshot load overhead (ms)
+PROPOSED_RECOVERY_PER_TASK_MS = 0.05 # per in-flight task state restore
+PROPOSED_RECOVERY_JITTER_MS = 1.5   # uniform jitter half-width (ms)
 
-# Ref[3] (Ala'anzy): full re-election — poll all nodes
-REF3_REELECTION_PER_NODE_MS = 15.0  # per-node polling overhead
+# Ref[3] (Ala'anzy): full re-election — poll all nodes, no cached state
+# Total = base + per_node * alive_count + per_task * in_flight_tasks
+REF3_REELECTION_BASE_MS = 8.0       # base election setup
+REF3_REELECTION_PER_NODE_MS = 12.0  # per-node polling overhead
+REF3_REELECTION_PER_TASK_MS = 0.3   # per in-flight task reschedule
+REF3_RECOVERY_JITTER_MS = 5.0       # uniform jitter half-width (ms)
 
-# Ref[6] (Jasim): SDN state reconstruction
-REF6_STATE_RECON_BASE_MS = 30.0     # base reconstruction time
-REF6_STATE_RECON_PER_NODE_MS = 10.0 # per-node state collection
+# Ref[6] (Jasim): SDN state reconstruction from distributed nodes
+# Total = base + per_node * alive + per_task * in_flight
+REF6_STATE_RECON_BASE_MS = 25.0     # base reconstruction time
+REF6_STATE_RECON_PER_NODE_MS = 8.0  # per-node state collection
+REF6_STATE_RECON_PER_TASK_MS = 0.2  # per in-flight task rebinding
+REF6_RECOVERY_JITTER_MS = 4.0       # uniform jitter half-width (ms)
 
-# Ref[20] (Kashyap): ACO reconvergence
-REF20_RECONVERGE_ITERATIONS = 5     # meta-heuristic iterations
-REF20_ITERATION_MS = 12.0           # per-iteration convergence time
+# Ref[20] (Kashyap): ACO reconvergence — iterative pheromone update
+# Iterations scale with sqrt(in_flight_tasks) to model convergence difficulty
+REF20_RECONVERGE_BASE_ITERATIONS = 3  # minimum iterations
+REF20_RECONVERGE_TASK_SCALE = 0.5     # additional iterations per sqrt(tasks)
+REF20_ITERATION_MS = 10.0             # per-iteration convergence time
+REF20_RECOVERY_JITTER_MS = 3.0        # uniform jitter half-width (ms)
 
 # ─────────────────── Baseline Scheduling ───────────────────────────
 # All baseline weights are neutral/equal per SKILL.md Rule 3
@@ -71,6 +84,7 @@ REF6_QUEUE_SCALE_MS = 10.0           # M/M/1 queue waiting time scale (ms)
 REF20_W_MAKESPAN = 0.5              # makespan weight in fitness
 REF20_W_ENERGY = 0.25               # energy weight
 REF20_W_RELIABILITY = 0.25          # reliability weight (1 - failure_rate)
+REF20_ENERGY_NORM = 500.0            # energy normalization constant
 
 # ─────────────────── Simulator Mechanics ───────────────────────────
 # These apply identically to ALL schemes (no bias).
@@ -82,12 +96,14 @@ TRUST_DECREMENT = 0.005              # trust loss per late workload (5:1 ratio)
 # ─────────────────── Plotting ──────────────────────────────────────
 SCHEME_COLORS = {
     "Proposed":              "#2563eb",   # blue
+    "Proposed (1-helper)":   "#6baed6",   # light blue
     "Ala'anzy et al.":       "#dc2626",   # red
     "Jasim & Al-Raweshidy":  "#16a34a",   # green
     "Kashyap et al.":        "#9333ea",   # purple
 }
 SCHEME_MARKERS = {
     "Proposed":              "o",
+    "Proposed (1-helper)":   "v",
     "Ala'anzy et al.":       "s",
     "Jasim & Al-Raweshidy":  "^",
     "Kashyap et al.":        "D",

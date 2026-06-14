@@ -82,12 +82,18 @@ class ProposedScheme(BaseScheme):
         max_total = config.QUEUE_CAPACITY * max_proc
         est_norm = min(est_total / max(max_total, 1.0), 1.0)
 
+        # Normalized latency and CPU for W2/W3 (Eq. 28)
+        lat_min, lat_max = config.LATENCY_RANGE
+        lat_norm = (node.latency - lat_min) / max(lat_max - lat_min, 1e-6)
+        lat_norm = max(0.0, min(1.0, lat_norm))
+        cpu_norm = node.cpu  # already [0, 1]
+
         fri = self._fri(node)
         rho = workload.priority
         return (
             config.SCHED_W1 * est_norm
-            + config.SCHED_W2 * 0.0       # latency already in est_total
-            - config.SCHED_W3 * 0.0        # CPU already in est_total
+            + config.SCHED_W2 * lat_norm
+            - config.SCHED_W3 * cpu_norm
             - config.SCHED_W4 * node.memory
             - config.SCHED_W5 * node.trust_score
             - config.SCHED_W6 * fri
@@ -157,9 +163,17 @@ class ProposedScheme(BaseScheme):
 
         return best
 
-    def handle_failure(self, nodes, failed_node) -> float:
-        # Instant recovery from replicated state (Eq. 43-44)
-        return sim_config.PROPOSED_RECOVERY_BASE_MS
+    def handle_failure(self, nodes, failed_node, in_flight_tasks=0) -> float:
+        # Recovery from replicated state snapshot (Eq. 43-44)
+        # Time = base + small per-task overhead + random jitter
+        import random
+        base = sim_config.PROPOSED_RECOVERY_BASE_MS
+        task_cost = sim_config.PROPOSED_RECOVERY_PER_TASK_MS * in_flight_tasks
+        jitter = random.uniform(
+            -sim_config.PROPOSED_RECOVERY_JITTER_MS,
+            sim_config.PROPOSED_RECOVERY_JITTER_MS,
+        )
+        return max(1.0, base + task_cost + jitter)
 
     def request_assistance(self, nodes, overloaded, workload) -> List[SimFogNode]:
         # Recovery-preserving helper selection (Eq. 36-38)

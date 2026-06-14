@@ -228,8 +228,10 @@ class Simulator:
                 del self._node_free_at[failed_node.node_id]
 
             # ─── Recovery ───────────────────────────────────────────
+            # Count in-flight tasks at failure time for state-dependent recovery
+            in_flight = sum(n.queue_load for n in self.env.fog_nodes if n.is_alive)
             recovery_ms = self.scheme.handle_failure(
-                self.env.fog_nodes, failed_node
+                self.env.fog_nodes, failed_node, in_flight
             )
 
             # During recovery, scheduling is paused
